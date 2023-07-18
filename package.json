@@ -1,0 +1,10 @@
+{
+  "name": "greg",
+  "version": "1.0.0",
+  "description": "Generate a Report of Events, G.R.E.G.",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": ["whisper", "llm", "transcription", "summaries"],
+  "author": "filipviz",
+  "license": "MIT"
+}
