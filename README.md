@@ -2,32 +2,25 @@
 
 *Generate a Report of Events, G.R.E.G.*
 
-`index.js` accepts a [craig](https://craig.chat/)-generated zip file as a command-line argument. It does the following:
+`main.sh` accepts a [craig](https://craig.chat/)-generated zip file as a command-line argument. It does the following:
 
 1. Extracts the archive.
-2. Transcribes each audio file using [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp).
-3. Consolidates audio files using [`ffmpeg`](https://ffmpeg.org/).
-4. Consolidates transcriptions.
-5. Fetches additional context from the Juicebox Town Hall Discord chat.
-6. Uses an LLM to summarize the meeting.
+2. Consolidates audio files using [`ffmpeg`](https://ffmpeg.org/).
+3. Breaks the audio file into segments, and transcribes them using [OpenAI's Whisper](https://openai.com/research/whisper).
+4. TODO: Fetch additional context from the Juicebox Town Hall Discord chat and agenda.
+5. Uses [`gpt-3.5-turbo-16k`](https://platform.openai.com/docs/models/gpt-3-5) to summarize the meeting.
 
 ## Requirements
 
-- [node](https://nodejs.org/)
-- [ffmpeg](https://ffmpeg.org/)
+- [`ffmpeg`](https://ffmpeg.org/)
+- [`jq`](https://jqlang.github.io/jq/download/)
 
 ## Usage
 
 ```bash
-# Initialize whisper.cpp submodule
-git submodule update --init
+# Create a .env file and enter your OpenAI API key
+cp .example.env .env
 
-# Download medium.en model from HuggingFace
-bash ./whisper/models/download-ggml-model.sh medium.en
-
-# Install dependencies
-npm install
-
-# Run
-node . <path_to_your_zip_file>
+# Run the script
+./main.sh
 ```
