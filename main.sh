@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 . .env
 if [ $# -eq 0 ]; then
@@ -57,22 +57,66 @@ for f in ./output/chunks/*; do
 done; wait
 echo "All transcribing completed."; echo
 
-echo "Generating report."
 start_time=$(awk '/^Start time:/ { print $3}' output/raw-audio/info.txt | sed 's/\s*//g')
-system="I would like you to provide a detailed markdown summary of the following meeting audio transcript. The meeting is the weekly JuiceboxDAO town hall, where Juicebox (an Ethereum funding protocol) is discussed. Please start with a summary that briefly outlines the main topics discussed. Following this, write markdown sections with detailed summaries for each significant topic. Within these sections, I would like bullet points summarizing the most important points raised. The meeting starts at $start_time and the participants are as follows: $participants."
+echo "Fetching Discord messages from town-hall-chat."
+CHAT_START_TIME=$(date -Ins -ud "$start_time - 3 hours")
+BASE_URL="https://discord.com/api/v10"
+TOWNHALL_CHANNEL_ID="1009220977906950234"
+
+message_id="latest"
+while true; do
+    if [ "$message_id" = "latest" ]; then
+        url="${BASE_URL}/channels/${TOWNHALL_CHANNEL_ID}/messages?limit=100"
+    else
+        url="${BASE_URL}/channels/${TOWNHALL_CHANNEL_ID}/messages?before=${message_id}&limit=100"
+    fi
+
+    response=$(curl -s -X GET "${url}" \
+        -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \
+        -H "Content-Type: application/json")
+
+    echo "$response" | jq -r '[.[] | select(.timestamp >= "'$CHAT_START_TIME'")] | reverse | .[] | .author.username + ": " + .content' >> output/chat-messages.txt
+
+    last_timestamp=$(echo "$response" | jq -r '.[-1].timestamp')
+    if [[ "$last_timestamp" < "$CHAT_START_TIME" ]]; then
+      break
+    fi
+    message_id=$(echo "$response" | jq -r '.[-1].id')
+    sleep 1
+done
+echo "town-hall-chat messages written to output/chat-messages.txt"
+
+echo "Fetching Discord messages from the Town Hall Agenda."
+AGENDAS_CHANNEL_ID="876226014001377330"
+response=$(curl -s -X GET "${BASE_URL}/channels/${AGENDAS_CHANNEL_ID}/messages?limit=100" \
+  -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
+  -H "Content-Type: application/json")
+thread_starter=$(echo "${response}" | jq -r --arg TOWNHALL_TIMESTAMP "$start_time" '.[] | select(.type == 18 and .thread.thread_metadata.create_timestamp != null and .thread.thread_metadata.create_timestamp < $TOWNHALL_TIMESTAMP) | .id' | head -1)
+
+# Assuming there will be fewer than 100 messages in the agenda thread.
+response=$(curl -s -X GET "${BASE_URL}/channels/${thread_starter}/messages?limit=100" \
+    -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \
+    -H "Content-Type: application/json")
+echo "$response" | jq -r '.[] | "\(.author.username): \(.content)"' | tac > output/agenda-messages.txt
+echo "Town Hall Agenda messages written to output/agenda-messages.txt"; echo
+
+echo "Generating report."
+agenda=$(cat output/agenda-messages.txt | tr -d '\"' | tr -d "\n")
+chat=$(cat output/chat-messages.txt | tr -d '\"' | tr -d "\n")
+system="I would like you to provide a detailed markdown summary of the following meeting audio transcript. The meeting is the weekly JuiceboxDAO town hall, where Juicebox (an Ethereum funding protocol) is discussed. JBM stands for https://juicebox.money. Please start with a summary that briefly outlines the main topics discussed. Following this, write markdown sections with detailed summaries for each significant topic. Within these sections, I would like bullet points summarizing the most important points raised. The meeting starts at $start_time and the participants are as follows: $participants. ### Here are messages pertaining to the meeting agenda: $agenda. ### Incorporate the links and context from these text chat messages in your report: $chat"
 transcript=$(cat output/transcripts/*.txt | tr -d '\"' | tr -d "\n")
 
-completion=$(curl https://api.openai.com/v1/chat/completions \
+response=$(curl https://api.openai.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -d '{
     "model": "gpt-3.5-turbo-16k",
     "messages": [
       {"role": "system", "content": "'"$system"'"},
-      {"role": "user", "content": "'"$transcript"'"}
+      {"role": "user", "content": "Here is the transcript: '"$transcript"'"}
     ]
   }')
 
-echo "$completion" > output/raw_res.json
-echo "$completion" | jq -r '.choices[0].message.content' > output/report.md
+echo "$response" > output/raw_res.json
+echo "$response" | jq -r '.choices[0].message.content' > output/report.md
 echo "Wrote report to output/report.md and raw response to output/raw_res.json."
