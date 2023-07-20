@@ -8,11 +8,15 @@ fi
 
 mkdir -p output
 echo "Extracting to output/raw-audio/"
-unzip -d output/raw-audio $1
+unzip -d output/raw-audio $1; echo
 
 echo "Processing audio and writing to output/processed.mp3. This may take a while."
-ffmpeg -loglevel 24 $(find output/raw-audio -maxdepth 1 -type f -iname "*.flac" -exec echo -n "-i {} " \;) -filter_complex "amix=inputs=$(ls output/raw-audio/*.flac | wc -l):duration=longest:dropout_transition=2, loudnorm=I=-16:TP=-1.5:LRA=11:print_format=summary" -c:a libmp3lame -b:a 128k output/processed.mp3
-echo "Finished processing audio."
+ffmpeg -loglevel 24 \
+  $(find output/raw-audio -maxdepth 1 -type f -iname "*.flac" -exec echo -n "-i {} " \;) \
+  -filter_complex "amix=inputs=$(ls output/raw-audio/*.flac | wc -l):duration=longest:dropout_transition=2, loudnorm=I=-16:TP=-1.5:LRA=11:print_format=summary" \
+  -c:a libmp3lame \
+  -b:a 128k output/processed.mp3
+echo "Finished processing audio."; echo
 
 echo "Splitting audio into chunks for transcription. Writing to output/chunks/"
 mkdir -p output/chunks
@@ -34,7 +38,7 @@ while [ $(awk -v a="$duration" -v b="$index" 'BEGIN {print (a * b < '$total_dura
 
   index=$((index+1))
 done; wait
-echo "Chunk encoding completed."
+echo "Chunk encoding completed."; echo
 
 participants=$(awk -F'[(]' '/Tracks:/{flag=1;next} flag{print $1}' output/raw-audio/info.txt | sed 's/\s*//g' | sed ':a; N; $!ba; s/\n/, /g')
 echo "Transcribing audio. This may take a while."
@@ -55,7 +59,7 @@ for f in ./output/chunks/*; do
 
   index=$((index+1))
 done; wait
-echo "All transcribing completed."
+echo "All transcribing completed."; echo
 
 echo "Generating report."
 start_time=$(awk '/^Start time:/ { print $3}' output/raw-audio/info.txt | sed 's/\s*//g')
@@ -76,4 +80,3 @@ completion=$(curl https://api.openai.com/v1/chat/completions \
 echo "$completion" > output/raw_res.json
 echo "$completion" | jq -r '.choices[0].message.content' > output/report.md
 echo "Wrote report to output/report.md and raw response to output/raw_res.json."
-echo "Done."
