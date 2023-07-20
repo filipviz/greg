@@ -21,6 +21,9 @@
 # Create a .env file and enter your OpenAI API key
 cp .example.env .env
 
+# Make the script executable
+sudo chmod +x main.sh
+
 # Run the script
-./main.sh
+bash main.sh
 ```
