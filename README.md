@@ -25,5 +25,5 @@ cp .example.env .env
 sudo chmod +x main.sh
 
 # Run the script
-bash main.sh
+bash main.sh your-craig-file.zip
 ```
