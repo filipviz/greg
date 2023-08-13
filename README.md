@@ -27,3 +27,12 @@ sudo chmod +x main.sh
 # Run the script
 bash main.sh your-craig-file.zip
 ```
+
+## Notes
+
+```bash
+# To import from a discordchatexporter-cli .csv
+messages=$(awk -F ',' '{if(NR>1) printf substr($2, 2, length($2)-2) ": " substr($4, 2, length($4)-2) " # "}' ./messages.csv | tr -d '\"' | tr -d "\n")
+# Add to system:
+system+=" Please incorporate links and context from the following messages from the meeting's realtime chat: $messages"
+```
